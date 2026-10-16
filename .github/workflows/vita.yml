@@ -1,0 +1,44 @@
+name: Vita native client
+on:
+  push:
+    paths: ['vita/**', 'build-vita.sh', '.gitmodules', '.github/workflows/vita.yml']
+  pull_request:
+    paths: ['vita/**', 'build-vita.sh', '.gitmodules', '.github/workflows/vita.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protocol:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install host dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build libcurl4-openssl-dev
+      - name: Build and exercise native protocol code
+        run: |
+          cmake -S vita -B build-vita-tests -G Ninja -DMOONFIN_HOST_TESTS=ON
+          cmake --build build-vita-tests
+          ctest --test-dir build-vita-tests --output-on-failure
+          python3 vita/tests/http_integration.py build-vita-tests/moonfin-tests
+  vpk:
+    runs-on: ubuntu-24.04
+    container: vitasdk/vitasdk:2026.08
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install pinned media dependencies
+        run: python3 vita/scripts/install-dependencies.py
+      - name: Build VPK
+        run: bash build-vita.sh
+      - name: Validate VPK contents
+        run: python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moonfin-Vita-${{ github.sha }}
+          path: |
+            build-vita/MoonfinVita.vpk
+            build-vita/MoonfinVita.velf
+          if-no-files-found: error

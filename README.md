@@ -1,6 +1,8 @@
 <h1 align="center">Moonfin</h1>
 <h3 align="center">Premium Jellyfin & Emby client for mobile, tablet, desktop, TV, and web</h3>
 
+> **PS Vita fork:** The native Vita client is in [`vita/`](vita/README.md). Build with `bash build-vita.sh` or use the **Vita native client** Actions workflow. Version 0.1.0 is an initial native preview; [port coverage and hardware checks](vita/PORT_STATUS.md) track the work toward full Moonfin parity.
+
 ---
 <p align="center">
   <img width="1920" height="1080" alt="moonfin_1920x1080" src="https://github.com/user-attachments/assets/b1d9c7d8-f113-457d-ab5c-1600bbd0600a" />

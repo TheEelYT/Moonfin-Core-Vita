@@ -1,0 +1,3 @@
+[submodule "vita/vendor/borealis"]
+	path = vita/vendor/borealis
+	url = https://github.com/dragonflylee/borealis.git

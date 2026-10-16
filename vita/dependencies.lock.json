@@ -1,0 +1,74 @@
+{
+  "packages": [
+    {
+      "file": "zlib-1.3.2-2-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/zlib-1.3.2-2-vita.pkg.tar.xz",
+      "sha256": "e5b601fe333edb3781c0821c8ea168448d0edb0195362fb391d60e2c0e5d423c"
+    },
+    {
+      "file": "libpng-1.6.58-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/libpng-1.6.58-1-vita.pkg.tar.xz",
+      "sha256": "45fd9c670fe91303b74481249dfbd6eef11f382eee094b3f72d6e97342c3ba5a"
+    },
+    {
+      "file": "fribidi-1.0.17-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/fribidi-1.0.17-1-vita.pkg.tar.xz",
+      "sha256": "edf6fa403ef06d6df81487bac3c291dea55e48e5182d9dfa0fe27d87d4224b7d"
+    },
+    {
+      "file": "bzip2-1.0.8-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/bzip2-1.0.8-1-vita.pkg.tar.xz",
+      "sha256": "81072eb7487878d1cfede1122997644892a3f750a3e7da676d80d729f4e635d0"
+    },
+    {
+      "file": "freetype-2.14.3-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/freetype-2.14.3-1-vita.pkg.tar.xz",
+      "sha256": "f7dd4534e13bec5bb63611185f0e7269be180e9bb1a51bbb9483066093485756"
+    },
+    {
+      "file": "harfbuzz-14.5.0-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/harfbuzz-14.5.0-1-vita.pkg.tar.xz",
+      "sha256": "a9da1d95f2514ee5e92bf257f1194e0c640aa633c2783fc8f136c9c4c85525e4"
+    },
+    {
+      "file": "libass-0.17.5-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/libass-0.17.5-1-vita.pkg.tar.xz",
+      "sha256": "646d104fec5be477064edf79a698c8d2dc32ac4a3bf4e0e8db2787fd1a620105"
+    },
+    {
+      "file": "zstd-1.5.7-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/zstd-1.5.7-1-vita.pkg.tar.xz",
+      "sha256": "8952615363f62179c9a9168bf7bab24e55b39db7f420ee63e580e1b141dc35f9"
+    },
+    {
+      "file": "libarchive-3.8.9-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/libarchive-3.8.9-1-vita.pkg.tar.xz",
+      "sha256": "673c2ef785bad1c819c93cffe0c5e9c49d7b49874b63858c43d835a242f0705c"
+    },
+    {
+      "file": "sdl2-2.32.8-1-vita.pkg.tar.xz",
+      "url": "https://github.com/vitasdk/vitasdk-autobuild/releases/download/packages-2026.08-snapshot-20261015.55.1/sdl2-2.32.8-1-vita.pkg.tar.xz",
+      "sha256": "53199dac0bfec090dd9eb9a8f438b8ee5641cedac269cc7518872f318ab748ee"
+    },
+    {
+      "file": "mbedtls-3.6.7-1-vita.pkg.tar.xz",
+      "url": "https://github.com/dragonflylee/switchfin/releases/download/vita-packages/mbedtls-3.6.7-1-vita.pkg.tar.xz",
+      "sha256": "6da396954aeb1a1fdfd8e73b7156c9918a32ca78b25ce535caad9b0268276aaf"
+    },
+    {
+      "file": "curl-8.16.0-3-vita.pkg.tar.xz",
+      "url": "https://github.com/dragonflylee/switchfin/releases/download/vita-packages/curl-8.16.0-3-vita.pkg.tar.xz",
+      "sha256": "a1d7332da137cca5910ea9aebd5f8340187cdc4c31dbac5894f1dbadf575e9fb"
+    },
+    {
+      "file": "ffmpeg-n6.0-3-vita.pkg.tar.xz",
+      "url": "https://github.com/dragonflylee/switchfin/releases/download/vita-packages/ffmpeg-n6.0-3-vita.pkg.tar.xz",
+      "sha256": "1a49a9d288ad9ac3a1f86c29ec6239dd44b0045b8f671f06575df1ffe044c5d7"
+    },
+    {
+      "file": "mpv-0.36.0-3-vita.pkg.tar.xz",
+      "url": "https://github.com/dragonflylee/switchfin/releases/download/vita-packages/mpv-0.36.0-3-vita.pkg.tar.xz",
+      "sha256": "529542bb8112474f8e11c7615d8f83e21385e11279c994a0021849e5a4561fd0"
+    }
+  ]
+}
