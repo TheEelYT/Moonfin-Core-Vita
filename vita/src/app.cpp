@@ -700,15 +700,15 @@ class PlayerView : public View {
         return;
       if (i == 2) {
         choose("Quality",
-               {"960×544 · 4 Mbps", "720p · 6 Mbps", "360p · 1 Mbps",
+               {"960×544 · 4 Mbps", "640×360 · 1 Mbps",
                 "Force transcode · 544p"},
                [this, weak](int n) {
                  if (weak.expired())
                    return;
                  auto o = options;
-                 o.height = n == 1 ? 720 : (n == 2 ? 360 : 544);
-                 o.bitrate = n == 1 ? 6000000 : (n == 2 ? 1000000 : 4000000);
-                 o.forceTranscode = n == 3;
+                 o.height = n == 1 ? 360 : 544;
+                 o.bitrate = n == 1 ? 1000000 : 4000000;
+                 o.forceTranscode = n == 2;
                  restart(o);
                });
         return;
@@ -999,11 +999,10 @@ void settings() {
   Application::pushActivity(p);
   button(p->body, "Streaming quality", [] {
     choose("Streaming quality",
-           {"544p · 4 Mbps (default)", "720p · 6 Mbps", "360p · 1 Mbps"},
+           {"960×544 · 4 Mbps (default)", "640×360 · 1 Mbps"},
            [](int i) {
-             app->config->height = i == 1 ? 720 : (i == 2 ? 360 : 544);
-             app->config->bitrate =
-                 i == 1 ? 6000000 : (i == 2 ? 1000000 : 4000000);
+             app->config->height = i == 1 ? 360 : 544;
+             app->config->bitrate = i == 1 ? 1000000 : 4000000;
              app->save();
            });
   });

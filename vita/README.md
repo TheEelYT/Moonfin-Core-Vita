@@ -2,7 +2,7 @@
 
 A native PlayStation Vita client in the Moonfin Core fork. The Vita target is C++17, Borealis and Vita mpv/GXM; it does not run Flutter or require a second proxy application on your PC. Jellyfin or Emby provides any required transcoding.
 
-**Current version: 0.1.1 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
+**Current version: 0.1.2 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
 
 ## Install and connect
 
@@ -26,7 +26,7 @@ The VPK uses title ID `MFVITA001`. Settings and access tokens are stored at `ux0
 | Start | — | Show controls |
 | Front touch | Select / scroll | Pause/resume |
 
-Cross/Circle follow the Vita's system confirm-button preference. The initial video profile is H.264 8-bit, at most 960×544/30 fps, stereo AAC/MP3 and 4 Mbps. A 720p/6 Mbps preset is available for testing. HEVC, AV1, HDR, multichannel audio, unsupported containers and selected subtitles are handled through server conversion. Subtitles are burned in by the server, including ASS and bitmap subtitles. Track and quality changes reopen the stream at its current position.
+Cross/Circle follow the Vita's system confirm-button preference. The initial video profile is H.264 8-bit, at most 960×544/30 fps, stereo AAC/MP3 and 4 Mbps. Video above 960×544 is automatically transcoded; the lower preset is 640×360 at 1 Mbps. Direct play requires known video dimensions within the selected preset. Transcoding re-encodes video instead of copying it into another container. Saved 720p settings are capped at 544p. HEVC, AV1, HDR, multichannel audio, unsupported containers and selected subtitles are handled through server conversion. Subtitles are burned in by the server, including ASS and bitmap subtitles. Track and quality changes reopen the stream at its current position.
 
 ## Build
 
@@ -39,7 +39,7 @@ export VITASDK=/usr/local/vitasdk
 export PATH="$VITASDK/bin:$PATH"
 python3 vita/scripts/install-dependencies.py
 bash build-vita.sh
-python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk
+python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk build-vita/MoonfinVita.elf
 ```
 
 The dependency installer checks SHA-256 hashes from `dependencies.lock.json` and installs packages in one transaction. Existing SDL2 headers from either `sdl2` or `sdl2_vitagl` are reused because the GXM target does not link SDL; a clean SDK receives the pinned SDL2 package. This avoids both the SDK image's conflicting SDL providers and the incomplete 2026.08 package snapshot encountered during development. It changes packages in the specified VitaSDK prefix; use a dedicated SDK prefix/container if that SDK serves other projects. The native workflow uses `vitasdk/vitasdk:2026.08`. No proprietary shader compiler package is required; this build uses GXM with precompiled shaders.

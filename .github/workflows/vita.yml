@@ -39,7 +39,7 @@ jobs:
       - name: Build VPK
         run: bash build-vita.sh
       - name: Validate VPK contents
-        run: python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk
+        run: python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk build-vita/MoonfinVita.elf
       - uses: actions/upload-artifact@v4
         with:
           name: Moonfin-Vita-${{ github.sha }}

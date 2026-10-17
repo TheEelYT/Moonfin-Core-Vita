@@ -1,6 +1,6 @@
 # Vita port status
 
-Version: **0.1.1 native preview**. This is an initial native implementation, not a declaration of full Moonfin parity. No physical Vita or personal Jellyfin/Emby server is attached to the development environment.
+Version: **0.1.2 native preview**. This is an initial native implementation, not a declaration of full Moonfin parity. No physical Vita or personal Jellyfin/Emby server is attached to the development environment.
 
 ## Implemented paths
 
@@ -48,7 +48,7 @@ Features that cannot map to the Vita's display, codec hardware or OS will need e
 
 ## Verification
 
-Validation completed in the development environment: VitaSDK cross-build and VPK identity/assets checks passed; 56 protocol and local HTTP checks passed. The user confirmed that the corrected VPK installs, launches and signs in to their server. Playback validation is pending.
+Portable validation: 76 protocol/local HTTP checks and 11 regression tests passed. The Vita workflow cross-builds the VPK and checks its identity, assets and linked pthread stack override. The user confirmed that the corrected VPK installs, launches and signs in to their server. Playback validation is pending.
 
 The first hardware installation attempt reported VitaShell error `0x8010113D`. The original package used truecolor LiveArea PNGs, including an RGBA icon. The corrected package uses opaque 8-bit indexed PNGs for the icon, background and startup image. Package validation now checks their encoding and dimensions, with regression tests rejecting truecolor, alpha and incorrect sizes. The user confirmed that the corrected package installs and launches. Startup then stopped at `ytdl: option not found`: the pinned Vita mpv build disables Lua and therefore omits that option. The unnecessary `ytdl=no` setting has been removed; the user subsequently confirmed successful startup and sign-in.
 
@@ -60,7 +60,15 @@ The uploaded core dump from build `6f1b79f` stops at `0x810b2320` in `brls::Appl
 
 The Vita build now compiles a generated Borealis override that releases null focus and clears focus before activity teardown. The submodule remains unchanged. New menu buttons take focus when their active page has none. Menu callbacks wait until action dispatch has finished and are cancelled if the button is deleted first, covering refresh, server switching and page retries. Host regressions execute the actual dependency focus methods and menu callback class against lightweight UI/queue stubs: the original focus methods fail, and the patched methods pass. These checks do not emulate drawing or establish device stability.
 
-Build artifacts now include source-line information and the original ELF for future dump analysis. After installing 0.1.1, repeat sign-in, leave Home idle, navigate its buttons, refresh Home and switch servers. On-device confirmation of this correction is pending.
+Build artifacts now include source-line information and the original ELF for future dump analysis. The user progressed to a playback attempt on 0.1.1; long-running navigation and server-switching checks remain useful.
+
+## 0.1.2 playback startup and resolution policy
+
+The next device dump faults at `0x816da122` in Vita newlib `poll`, called by FFmpeg `ff_connect_parallel`/TCP/HTTP. The crashed pthread has a 32 KiB stack starting at `0x81bb9000`; its stack pointer is `0x81bb8cd8`, below that allocation. The faulting instruction stores a local variable after `poll` reserves about 9 KiB. This is stack exhaustion during stream connection, before decoding.
+
+The app now supplies the Vita pthread override `_pthread_stack_default_user = 2 MiB`, also used by the referenced Switchfin Vita target. Package validation checks the final ELF for a strong, defined override with the intended allocation; the original 0.1.1 ELF fails this check. On-device playback confirmation is pending.
+
+The maximum video dimensions are now 960×544, including when legacy settings request 720p. The lower preset is 640×360. Known oversized sources disable direct play immediately. If dimensions only arrive in PlaybackInfo, an oversized or unknown-size source incorrectly marked directly playable is renegotiated with direct play disabled and its media source pinned. Video stream copy is disabled, so fallback requires actual encoding rather than remuxing. Compatible known-size video can still direct-play, and audio does not require video dimensions. Regression cases cover native/360p limits, 1080p/4K, one-pixel boundary violations, portrait video, unknown dimensions, selected versions and resume retention.
 
 ## First hardware pass
 

@@ -33,7 +33,7 @@ set(USE_VITA_SHARK OFF CACHE BOOL "" FORCE)
 set(USE_LIBROMFS OFF CACHE BOOL "" FORCE)
 include("${BOREALIS_LIBRARY}/cmake/commonOption.cmake")
 include("${BOREALIS_LIBRARY}/cmake/toolchain.cmake")
-project(MoonfinVita VERSION 0.1.1 LANGUAGES C CXX)
+project(MoonfinVita VERSION 0.1.2 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
@@ -80,7 +80,7 @@ configure_file(../assets/fonts/Roboto-Regular.ttf "${PACK_RES}/font/switch_font.
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 vita_create_self(MoonfinVita.self MoonfinVita UNSAFE NOASLR)
 vita_create_vpk(MoonfinVita.vpk MFVITA001 MoonfinVita.self
-  VERSION 00.11 NAME "Moonfin Vita"
+  VERSION 00.12 NAME "Moonfin Vita"
   FILE "${PACK_RES}" resources
        "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png" sce_sys/icon0.png
        "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml" sce_sys/livearea/contents/template.xml

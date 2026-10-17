@@ -249,9 +249,49 @@ void Client::watched(const std::string &id, bool v) const {
           "/Users/" + encode(current.userId) + "/PlayedItems/" + encode(id));
 }
 
+namespace {
+int videoHeight(int height) { return std::clamp(height, 360, maxVideoHeight); }
+int videoWidth(int height) {
+  return std::min(maxVideoWidth, (videoHeight(height) * 16 / 9) & ~1);
+}
+enum class Resolution { Unknown, Fits, TooLarge };
+Resolution resolution(const Json &media, int height) {
+  auto streams = media.find("MediaStreams");
+  if (streams == media.end() || !streams->is_array())
+    return Resolution::Unknown;
+  bool found = false;
+  for (const auto &stream : *streams) {
+    if (stringValue(stream, "Type") != "Video" ||
+        stream.value("IsAttachedPic", false))
+      continue;
+    const auto w = integerValue(stream, "Width");
+    const auto h = integerValue(stream, "Height");
+    if (w > videoWidth(height) || h > videoHeight(height))
+      return Resolution::TooLarge;
+    if (w <= 0 || h <= 0)
+      return Resolution::Unknown;
+    found = true;
+  }
+  return found ? Resolution::Fits : Resolution::Unknown;
+}
+Json selectSource(const Json &info, const std::string &id) {
+  if (!stringValue(info, "ErrorCode").empty())
+    throw std::runtime_error("The server cannot play this item: " +
+                             stringValue(info, "ErrorCode"));
+  auto sources = info.value("MediaSources", Json::array());
+  if (!sources.is_array() || sources.empty())
+    throw std::runtime_error("No playable media source was returned.");
+  if (id.empty())
+    return sources.front();
+  for (const auto &source : sources)
+    if (stringValue(source, "Id") == id)
+      return source;
+  throw std::runtime_error("The selected media version is unavailable.");
+}
+} // namespace
 Json vitaProfile(int bitrate, int height) {
-  height = std::clamp(height, 360, 720);
-  const int width = height <= 544 ? 960 : 1280;
+  height = videoHeight(height);
+  const int width = videoWidth(height);
   Json conditions =
       Json::array({{{"Condition", "LessThanEqual"},
                     {"Property", "Width"},
@@ -355,36 +395,58 @@ Playback Client::resolve(const Json &item, const PlaybackOptions &options,
   const std::string id = stringValue(item, "Id");
   if (id.empty())
     throw std::runtime_error("This item has no identifier.");
+  const bool audio = stringValue(item, "MediaType") == "Audio" ||
+                     stringValue(item, "Type") == "Audio";
+  Json knownSource = item;
+  if (item.contains("MediaSources") && item["MediaSources"].is_array() &&
+      !item["MediaSources"].empty()) {
+    knownSource = options.sourceId.empty()
+                      ? item["MediaSources"].front()
+                      : Json::object();
+    for (const auto &candidate : item["MediaSources"])
+      if (stringValue(candidate, "Id") == options.sourceId)
+        knownSource = candidate;
+  }
+  const bool allowDirect = !options.forceTranscode &&
+                           options.subtitleIndex < 0 && options.audioIndex < 0 &&
+                           stringValue(item, "Type") != "TvChannel" &&
+                           (audio || resolution(knownSource, options.height) !=
+                                         Resolution::TooLarge);
   Json body = {{"UserId", current.userId},
                {"DeviceProfile", vitaProfile(options.bitrate, options.height)},
                {"MaxStreamingBitrate", options.bitrate},
                {"StartTimeTicks", 0},
                {"IsPlayback", true},
                {"AutoOpenLiveStream", true},
-               {"EnableDirectPlay", !options.forceTranscode &&
-                                        options.subtitleIndex < 0 &&
-                                        options.audioIndex < 0},
-               {"EnableDirectStream", !options.forceTranscode &&
-                                          options.subtitleIndex < 0 &&
-                                          options.audioIndex < 0},
+               {"EnableDirectPlay", allowDirect},
+               {"EnableDirectStream", audio && allowDirect},
+               // Re-encode video whenever direct play is unsuitable. A remux
+               // would retain the oversized/unsupported original video stream.
+               {"AllowVideoStreamCopy", false},
                {"EnableTranscoding", true},
                {"SubtitleStreamIndex", options.subtitleIndex}};
   if (options.audioIndex >= 0)
     body["AudioStreamIndex"] = options.audioIndex;
   if (!options.sourceId.empty())
     body["MediaSourceId"] = options.sourceId;
-  auto info = request("POST", "/Items/" + encode(id) + "/PlaybackInfo",
-                      {{"UserId", current.userId}}, body);
-  if (!stringValue(info, "ErrorCode").empty())
-    throw std::runtime_error("The server cannot play this item: " +
-                             stringValue(info, "ErrorCode"));
-  auto sources = info.value("MediaSources", Json::array());
-  if (!sources.is_array() || sources.empty())
-    throw std::runtime_error("No playable media source was returned.");
-  Json source = sources.front();
-  for (auto &s : sources)
-    if (stringValue(s, "Id") == options.sourceId)
-      source = s;
+  auto negotiate = [&] {
+    return request("POST", "/Items/" + encode(id) + "/PlaybackInfo",
+                   {{"UserId", current.userId}}, body);
+  };
+  auto info = negotiate();
+  auto source = selectSource(info, options.sourceId);
+  // PlaybackInfo may be the first response containing video dimensions.
+  // Never trust SupportsDirectPlay for oversized or unknown-size video.
+  if (!audio && body["EnableDirectPlay"].get<bool>() &&
+      source.value("SupportsDirectPlay", false) &&
+      resolution(source, options.height) != Resolution::Fits) {
+    const auto sourceId = stringValue(source, "Id");
+    body["EnableDirectPlay"] = false;
+    body["EnableDirectStream"] = false;
+    body["MediaSourceId"] = sourceId;
+    info = negotiate();
+    source = selectSource(info, sourceId);
+  }
   Playback p;
   p.itemId = id;
   p.sourceId = stringValue(source, "Id");
@@ -397,8 +459,6 @@ Playback Client::resolve(const Json &item, const PlaybackOptions &options,
   const bool canDirect = body["EnableDirectPlay"].get<bool>() &&
                          source.value("SupportsDirectPlay", false);
   if (canDirect && stringValue(item, "Type") != "TvChannel") {
-    const bool audio = stringValue(item, "MediaType") == "Audio" ||
-                       stringValue(item, "Type") == "Audio";
     p.url = url((audio ? "/Audio/" : "/Videos/") + encode(id) + "/stream",
                 {{"Static", "true"},
                  {"MediaSourceId", p.sourceId},
@@ -485,7 +545,7 @@ Settings Settings::load(const std::string &path) {
     s.active = -1;
   s.bitrate = std::clamp<int64_t>(integerValue(j, "bitrate", 4000000), 500000,
                                   10000000);
-  s.height = std::clamp<int64_t>(integerValue(j, "height", 544), 360, 720);
+  s.height = std::clamp<int64_t>(integerValue(j, "height", 544), 360, maxVideoHeight);
   s.forceTranscode = j.value("forceTranscode", false);
   return s;
 }

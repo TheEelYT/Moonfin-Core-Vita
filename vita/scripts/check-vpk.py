@@ -4,6 +4,7 @@ import struct
 import sys
 import zipfile
 import zlib
+from pathlib import Path
 
 
 LIVEAREA_IMAGES = {
@@ -72,5 +73,34 @@ def check_contents(vpk):
     print("VPK contents, LiveArea PNG encoding and application identity verified:", len(vpk.namelist()), "entries")
 
 
+def check_thread_stack(path):
+    """Check the linked ELF, not just source text: pthread must see our override."""
+    data = Path(path).read_bytes()
+    assert data[:6] == b"\x7fELF\x01\x01", "Expected a little-endian ELF32 executable"
+    section_offset, = struct.unpack_from("<I", data, 32)
+    section_size, section_count = struct.unpack_from("<HH", data, 46)
+    sections = [struct.unpack_from("<10I", data, section_offset + i * section_size)
+                for i in range(section_count)]
+    for section in sections:
+        if section[1] != 2:  # SHT_SYMTAB
+            continue
+        strings = sections[section[6]]
+        names = data[strings[4]:strings[4] + strings[5]]
+        for offset in range(section[4], section[4] + section[5], section[9]):
+            name, address, size, info, other, index = struct.unpack_from("<IIIBBH", data, offset)
+            if names[name:].split(b"\0", 1)[0] != b"_pthread_stack_default_user":
+                continue
+            assert info >> 4 == 1 and info & 15 == 1 and size == 4, "Thread stack override must be a strong object symbol"
+            assert 0 < index < len(sections), "Thread stack override is undefined"
+            storage = sections[index]
+            value, = struct.unpack_from("<I", data, storage[4] + address - storage[3])
+            assert value >= 2 * 1024 * 1024, "Thread stack is too small for Vita FFmpeg networking"
+            print("Linked pthread default stack verified:", value, "bytes")
+            return
+    raise AssertionError("Missing linked _pthread_stack_default_user override")
+
+
 if __name__ == "__main__":
     check_vpk(sys.argv[1])
+    if len(sys.argv) > 2:
+        check_thread_stack(sys.argv[2])

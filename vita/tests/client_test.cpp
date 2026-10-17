@@ -53,7 +53,12 @@ Json source(
        Json::array({{{"Id", "source"},
                      {"SupportsDirectPlay", direct},
                      {"TranscodingUrl", url},
-                     {"MediaStreams", Json::array({{{"Index", 2},
+                     {"MediaStreams", Json::array({{{"Index", 0},
+                                                    {"Type", "Video"},
+                                                    {"Codec", "h264"},
+                                                    {"Width", 640},
+                                                    {"Height", 360}},
+                                                   {{"Index", 2},
                                                     {"Type", "Subtitle"},
                                                     {"Codec", "ass"}}})}}})}};
 }
@@ -195,8 +200,10 @@ void protocol() {
           "server subtitles");
   require(
       vitaProfile(6000000, 720)["CodecProfiles"][0]["Conditions"][0]["Value"] ==
-          "1280",
-      "720p width cap");
+          "960" &&
+      vitaProfile(6000000, 720)["CodecProfiles"][0]["Conditions"][1]["Value"] ==
+          "544",
+      "legacy 720p requests stay within the display cap");
   Settings settings;
   settings.accounts.push_back(account);
   settings.active = 0;
@@ -216,9 +223,83 @@ void protocol() {
   }
   auto bounded = Settings::load(path);
   std::remove(path);
-  require(bounded.height == 720 && bounded.bitrate == 500000 &&
+  require(bounded.height == 544 && bounded.bitrate == 500000 &&
               bounded.active == -1,
           "untrusted settings bounds");
+}
+void resolutionPolicy() {
+  auto f = std::make_shared<Fake>();
+  Client client(f, {"http://server.test", "Server", "user", "Gene", "token"},
+                "device");
+  const auto item = Json{{"Id", "movie"}, {"Type", "Movie"}, {"MediaType", "Video"}};
+  auto replyWithSize = [](int w, int h) {
+    auto reply = source(true);
+    auto &video = reply["MediaSources"][0]["MediaStreams"][0];
+    video["Width"] = w;
+    video["Height"] = h;
+    return reply;
+  };
+  for (const auto &size : std::vector<std::pair<int, int>>{
+           {1920, 1080}, {3840, 2160}, {961, 544}, {960, 545}, {544, 960}}) {
+    auto reply = replyWithSize(size.first, size.second);
+    auto known = item;
+    known["MediaSources"] = reply["MediaSources"];
+    f->reply(reply);
+    const auto before = f->calls.size();
+    auto play = client.resolve(known, {}, 120000000);
+    require(play.method == "Transcode" && f->calls.size() == before + 1,
+            "known oversized source requests transcoding immediately");
+    require(!f->last().body["EnableDirectPlay"].get<bool>() &&
+                !f->last().body["EnableDirectStream"].get<bool>() &&
+                !f->last().body["AllowVideoStreamCopy"].get<bool>(),
+            "oversized video cannot bypass encoding through direct play or remux");
+  }
+  f->reply(replyWithSize(960, 544));
+  require(client.resolve(item, {}, 0).method == "DirectPlay",
+          "exact native resolution remains directly playable");
+  f->reply(replyWithSize(1920, 1080));
+  auto before = f->calls.size();
+  auto play = client.resolve(item, {}, 120000000);
+  require(f->calls.size() == before + 2 && play.method == "Transcode",
+          "oversized PlaybackInfo overrides an incorrect direct-play flag");
+  require(f->last().body["MediaSourceId"] == "source" &&
+              play.startTicks == 120000000,
+          "renegotiation retains the selected source and resume position");
+  auto unknown = source(true);
+  unknown["MediaSources"][0]["MediaStreams"][0].erase("Width");
+  unknown["MediaSources"][0]["MediaStreams"][0].erase("Height");
+  f->reply(unknown);
+  require(client.resolve(item, {}, 0).method == "Transcode",
+          "unknown video dimensions are not directly played");
+  PlaybackOptions low;
+  low.height = 360;
+  low.bitrate = 1000000;
+  f->reply(replyWithSize(960, 544));
+  require(client.resolve(item, low, 0).method == "Transcode",
+          "native-sized video respects the lower quality preset");
+  require(vitaProfile(1000000, 360)["CodecProfiles"][0]["Conditions"][0]["Value"] == "640",
+          "360p width cap is 640 pixels");
+  f->reply(replyWithSize(640, 360));
+  require(client.resolve(item, low, 0).method == "DirectPlay",
+          "compatible 360p video remains directly playable");
+  PlaybackOptions selected;
+  selected.sourceId = "small";
+  auto versions = replyWithSize(3840, 2160);
+  auto small = replyWithSize(640, 360)["MediaSources"][0];
+  small["Id"] = "small";
+  versions["MediaSources"].push_back(small);
+  auto known = item;
+  known["MediaSources"] = versions["MediaSources"];
+  f->reply(versions);
+  play = client.resolve(known, selected, 0);
+  require(play.method == "DirectPlay" && play.sourceId == "small",
+          "selected low-resolution version is evaluated independently");
+  selected.sourceId = "missing";
+  throws([&] { client.resolve(known, selected, 0); });
+  auto audio = Json{{"Id", "song"}, {"Type", "Audio"}, {"MediaType", "Audio"}};
+  f->reply(source(true));
+  require(client.resolve(audio, {}, 0).method == "DirectPlay",
+          "audio direct play does not require video dimensions");
 }
 void queue() {
   Jobs q;
@@ -253,6 +334,7 @@ void queue() {
 int main(int argc, char **argv) {
   try {
     protocol();
+    resolutionPolicy();
     queue();
     if (argc > 1) {
       auto http = std::make_shared<CurlTransport>();

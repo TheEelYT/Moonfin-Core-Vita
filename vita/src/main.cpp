@@ -10,7 +10,12 @@
 #include <psp2/power.h>
 
 // 256 MiB leaves space for GXM, decoder surfaces, and system services.
+extern "C" {
 unsigned int _newlib_heap_size_user = 256 * 1024 * 1024;
+// FFmpeg's nested HTTP/TCP calls plus Vita newlib poll exceed the SDK's
+// 32 KiB pthread default. This override also applies to mpv-created threads.
+unsigned int _pthread_stack_default_user = 2 * 1024 * 1024;
+}
 
 int main(int, char **) {
   std::setlocale(LC_NUMERIC, "C");
