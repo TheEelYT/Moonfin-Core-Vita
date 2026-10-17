@@ -42,7 +42,7 @@ bash build-vita.sh
 python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk
 ```
 
-The dependency installer checks SHA-256 hashes from `dependencies.lock.json` and installs a complete, pinned set in one transaction. This avoids the incomplete 2026.08 package snapshot encountered during development. It changes packages in the specified VitaSDK prefix; use a dedicated SDK prefix/container if that SDK serves other projects. The native workflow uses `vitasdk/vitasdk:2026.08`. No proprietary shader compiler package is required; this build uses GXM with precompiled shaders.
+The dependency installer checks SHA-256 hashes from `dependencies.lock.json` and installs packages in one transaction. Existing SDL2 headers from either `sdl2` or `sdl2_vitagl` are reused because the GXM target does not link SDL; a clean SDK receives the pinned SDL2 package. This avoids both the SDK image's conflicting SDL providers and the incomplete 2026.08 package snapshot encountered during development. It changes packages in the specified VitaSDK prefix; use a dedicated SDK prefix/container if that SDK serves other projects. The native workflow uses `vitasdk/vitasdk:2026.08`. No proprietary shader compiler package is required; this build uses GXM with precompiled shaders.
 
 The **Vita native client** GitHub Actions workflow builds both the VPK and the portable protocol tests. Its artifact includes the VPK and debug VELF.
 

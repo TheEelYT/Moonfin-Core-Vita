@@ -22,6 +22,7 @@ jobs:
           cmake --build build-vita-tests
           ctest --test-dir build-vita-tests --output-on-failure
           python3 vita/tests/http_integration.py build-vita-tests/moonfin-tests
+          python3 -m unittest discover -s vita/tests -p 'test_*.py'
   vpk:
     runs-on: ubuntu-24.04
     container: vitasdk/vitasdk:2026.08
