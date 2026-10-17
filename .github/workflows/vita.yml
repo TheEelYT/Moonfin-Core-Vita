@@ -30,6 +30,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Trust checked-out repositories in the SDK container
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/vita/vendor/borealis"
       - name: Install pinned media dependencies
         run: python3 vita/scripts/install-dependencies.py
       - name: Build VPK
