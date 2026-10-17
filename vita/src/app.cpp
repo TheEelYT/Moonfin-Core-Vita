@@ -2,10 +2,12 @@
 #include "moonfin/app.hpp"
 #include "moonfin/player.hpp"
 #include "moonfin/runtime.hpp"
+#include "moonfin/timeline.hpp"
 #include <algorithm>
 #include <borealis.hpp>
 #include <cmath>
 #include <ctime>
+#include <limits>
 #include <sstream>
 
 namespace moonfin {
@@ -90,7 +92,10 @@ Button *button(Box *parent, const std::string &text, std::function<void()> cb,
   return b;
 }
 std::string clockText(double seconds) {
-  int s = std::max(0, static_cast<int>(seconds));
+  if (!std::isfinite(seconds))
+    return "--:--";
+  int s = static_cast<int>(std::clamp(
+      seconds, 0.0, static_cast<double>(std::numeric_limits<int>::max())));
   char out[32];
   if (s >= 3600)
     std::snprintf(out, sizeof(out), "%d:%02d:%02d", s / 3600, s / 60 % 60,
@@ -683,14 +688,69 @@ void detail(Json shallow) {
       });
 }
 
+class PlaybackTouchGesture : public GestureRecognizer {
+  TimelineTouch &timeline;
+  std::function<double()> duration;
+  std::function<bool()> controlsVisible;
+  std::function<void(const TimelineTouch::Result &)> respond;
+
+public:
+  PlaybackTouchGesture(TimelineTouch &timeline, std::function<double()> duration,
+                       std::function<bool()> visible,
+                       std::function<void(const TimelineTouch::Result &)> respond)
+      : timeline(timeline), duration(std::move(duration)),
+        controlsVisible(std::move(visible)), respond(std::move(respond)) {}
+  GestureState recognitionLoop(TouchState touch, MouseState mouse, View *view,
+                               Sound *sound) override {
+    *sound = SOUND_NONE;
+    auto phase = touch.phase;
+    auto position = touch.position;
+    int finger = touch.fingerId;
+    if (phase == TouchPhase::NONE) {
+      phase = mouse.leftButton;
+      position = mouse.position;
+      finger = -1;
+    }
+    if (!enabled || state == GestureState::INTERRUPTED) {
+      timeline.cancel();
+      if (!enabled || phase != TouchPhase::START)
+        return state = GestureState::FAILED;
+    }
+    if (phase == TouchPhase::NONE)
+      return GestureState::FAILED;
+    const auto event = phase == TouchPhase::START ? TimelineTouch::Phase::Begin
+                       : phase == TouchPhase::END ? TimelineTouch::Phase::End
+                                                  : TimelineTouch::Phase::Move;
+    const auto bounds = TimelineBounds::fromFrame(
+        view->getX(), view->getY(), view->getWidth(), view->getHeight());
+    auto result = timeline.update(event, finger, position.x, position.y, bounds,
+                                  duration(), controlsVisible());
+    // Ignore other fingers without cancelling the captured finger's gesture.
+    if (!result.accepted)
+      return GestureState::FAILED;
+    state = phase == TouchPhase::START ? GestureState::START
+            : phase == TouchPhase::END ? GestureState::END : GestureState::STAY;
+    Application::giveFocus(view);
+    respond(result);
+    return state;
+  }
+};
+
 class PlayerView : public View {
   Json item;
   PlaybackOptions options;
   Playback playback;
   std::shared_ptr<int> alive = std::make_shared<int>(0);
   std::chrono::steady_clock::time_point visibleUntil;
+  TimelineTouch timeline;
+  std::optional<double> pendingSeek;
+  std::chrono::steady_clock::time_point seekPreviewUntil;
   void reveal() {
     visibleUntil = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  }
+  bool controlsVisible() const {
+    return timeline.active() || std::chrono::steady_clock::now() <= visibleUntil ||
+           app->player->paused() || !app->player->activeSegment().empty();
   }
   void tracks() {
     std::vector<std::string> names = {"Audio track", "Subtitles", "Quality"};
@@ -815,7 +875,26 @@ public:
       reveal();
       return true;
     });
-    addGestureRecognizer(new TapGestureRecognizer(this));
+    addGestureRecognizer(new PlaybackTouchGesture(
+        timeline, [] { return app->player->duration(); },
+        [this] { return controlsVisible(); },
+        [this](const TimelineTouch::Result &touch) {
+          if (touch.reveal)
+            reveal();
+          if (touch.togglePause)
+            app->player->togglePause();
+          if (touch.seek) {
+            try {
+              app->player->seek(*touch.seek, true);
+              pendingSeek = touch.seek;
+              seekPreviewUntil = std::chrono::steady_clock::now() +
+                                 std::chrono::seconds(3);
+            } catch (const std::exception &e) {
+              pendingSeek.reset();
+              message(e.what());
+            }
+          }
+        }));
     registerClickAction([this](View *) {
       app->player->togglePause();
       reveal();
@@ -866,14 +945,25 @@ public:
       app->player->stop();
     }
   }
+  void onFocusLost() override {
+    timeline.cancel();
+    pendingSeek.reset();
+    View::onFocusLost();
+  }
   void draw(NVGcontext *vg, float x, float y, float w, float h, Style,
             FrameContext *) override {
     auto &player = *app->player;
     player.draw(vg, x, y, w, h);
     const auto segment = player.activeSegment();
-    if (std::chrono::steady_clock::now() > visibleUntil && !player.paused() &&
-        segment.empty())
+    if (!controlsVisible())
       return;
+    if (pendingSeek &&
+        (std::abs(player.position() - *pendingSeek) < 1 ||
+         std::chrono::steady_clock::now() > seekPreviewUntil))
+      pendingSeek.reset();
+    const double shownPosition = timeline.scrubbing()
+                                     ? timeline.preview()
+                                     : pendingSeek.value_or(player.position());
     nvgBeginPath(vg);
     nvgRect(vg, x, y + h - 160, w, 160);
     nvgFillColor(vg, nvgRGBA(6, 10, 20, 225));
@@ -883,26 +973,34 @@ public:
     nvgFontSize(vg, 27);
     nvgFillColor(vg, nvgRGB(245, 246, 250));
     nvgText(vg, x + 28, y + h - 145, player.title.c_str(), nullptr);
-    const auto status = (player.paused() ? "Paused · " : "") +
-                        clockText(player.position()) + " / " +
+    const auto status = (timeline.scrubbing() ? "Seek to "
+                         : pendingSeek ? "Seeking · "
+                         : player.paused() ? "Paused · " : "") +
+                        clockText(shownPosition) + " / " +
                         clockText(player.duration()) + " · " + player.method;
     nvgFontSize(vg, 22);
     nvgText(vg, x + 28, y + h - 108, status.c_str(), nullptr);
+    const auto bar = TimelineBounds::fromFrame(x, y, w, h);
     nvgBeginPath(vg);
-    nvgRect(vg, x + 28, y + h - 70, w - 56, 5);
+    nvgRoundedRect(vg, bar.left, bar.centerY - 4, bar.width, 8, 4);
     nvgFillColor(vg, nvgRGB(60, 66, 78));
     nvgFill(vg);
-    if (player.duration() > 0) {
+    if (std::isfinite(player.duration()) && player.duration() > 0) {
+      const auto fraction = std::isfinite(shownPosition)
+                                ? std::clamp(shownPosition / player.duration(), 0.0, 1.0)
+                                : 0.0;
       nvgBeginPath(vg);
-      nvgRect(vg, x + 28, y + h - 70,
-              (w - 56) *
-                  std::clamp(player.position() / player.duration(), 0.0, 1.0),
-              5);
+      nvgRoundedRect(vg, bar.left, bar.centerY - 4, bar.width * fraction, 8, 4);
       nvgFillColor(vg, nvgRGB(73, 173, 255));
+      nvgFill(vg);
+      nvgBeginPath(vg);
+      nvgCircle(vg, bar.left + bar.width * fraction, bar.centerY,
+                timeline.scrubbing() ? 12 : 8);
+      nvgFillColor(vg, nvgRGB(245, 246, 250));
       nvgFill(vg);
     }
     nvgFontSize(vg, 19);
-    const std::string help = "Cross: pause  ·  D-pad: seek/volume  ·  Square: "
+    const std::string help = "Drag bar: seek  ·  Cross: pause  ·  D-pad: seek/volume  ·  Square: "
                              "tracks  ·  Circle: back";
     nvgText(vg, x + 28, y + h - 46, help.c_str(), nullptr);
     if (!segment.empty()) {

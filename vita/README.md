@@ -2,7 +2,7 @@
 
 A native PlayStation Vita client in the Moonfin Core fork. The Vita target is C++17, Borealis and Vita mpv/GXM; it does not run Flutter or require a second proxy application on your PC. Jellyfin or Emby provides any required transcoding.
 
-**Current version: 0.1.2 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
+**Current version: 0.1.3 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
 
 ## Install and connect
 
@@ -24,7 +24,9 @@ The VPK uses title ID `MFVITA001`. Settings and access tokens are stored at `ux0
 | Triangle | — | Skip the active intro/credits segment, if the server provides it |
 | L / R | — | Seek 60 seconds |
 | Start | — | Show controls |
-| Front touch | Select / scroll | Pause/resume |
+| Front touch | Select / scroll | Reveal controls; tap/drag the timeline to seek |
+
+When controls are hidden, the first touch reveals them. Tap or drag anywhere along the visible timeline: the handle and time display preview your target, and lifting your finger seeks once. Playback keeps its playing/paused state. With controls visible, tapping the video area outside the bar toggles pause. Unknown-duration streams do not offer timeline seeking.
 
 Cross/Circle follow the Vita's system confirm-button preference. The initial video profile is H.264 8-bit, at most 960×544/30 fps, stereo AAC/MP3 and 4 Mbps. Video above 960×544 is automatically transcoded; the lower preset is 640×360 at 1 Mbps. Direct play requires known video dimensions within the selected preset. Transcoding re-encodes video instead of copying it into another container. Saved 720p settings are capped at 544p. HEVC, AV1, HDR, multichannel audio, unsupported containers and selected subtitles are handled through server conversion. Subtitles are burned in by the server, including ASS and bitmap subtitles. Track and quality changes reopen the stream at its current position.
 
