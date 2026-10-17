@@ -50,6 +50,8 @@ Features that cannot map to the Vita's display, codec hardware or OS will need e
 
 Validation completed in the development environment: VitaSDK cross-build and VPK identity/assets checks passed; 56 protocol and local HTTP checks passed. Physical-device validation is pending.
 
+The first hardware installation attempt reported VitaShell error `0x8010113D`. The original package used truecolor LiveArea PNGs, including an RGBA icon. The corrected package uses opaque 8-bit indexed PNGs for the icon, background and startup image. Package validation now checks their encoding and dimensions, with regression tests rejecting truecolor, alpha and incorrect sizes. Installation of the corrected package still needs device confirmation.
+
 The portable tests exercise the code used by the native client: URL escaping/base paths, login, profile limits, direct/transcoded resolution, track indices, resume tick conversion, session cleanup, settings persistence, queue ordering, HTTP request transport, redirect refusal and response-size bounds. They use scripted responses and a local HTTP test server. They do **not** establish that a video has played on a real Vita.
 
 ## First hardware pass
