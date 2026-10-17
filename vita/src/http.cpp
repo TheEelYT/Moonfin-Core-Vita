@@ -59,7 +59,8 @@ Response CurlTransport::send(const std::string &method, const std::string &url,
   curl_easy_setopt(e.p, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(e.p, CURLOPT_WRITEFUNCTION, receive);
   curl_easy_setopt(e.p, CURLOPT_WRITEDATA, &b);
-  curl_easy_setopt(e.p, CURLOPT_USERAGENT, "Moonfin-Vita/0.1.0");
+  const auto userAgent = std::string("Moonfin-Vita/") + version;
+  curl_easy_setopt(e.p, CURLOPT_USERAGENT, userAgent.c_str());
   curl_easy_setopt(e.p, CURLOPT_ACCEPT_ENCODING, "");
   // API redirects are not followed with credentials. Use the final server URL
   // at setup.

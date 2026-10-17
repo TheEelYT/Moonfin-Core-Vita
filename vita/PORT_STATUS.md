@@ -1,6 +1,6 @@
 # Vita port status
 
-Version: **0.1.0 native preview**. This is an initial native implementation, not a declaration of full Moonfin parity. No physical Vita or personal Jellyfin/Emby server is attached to the development environment.
+Version: **0.1.1 native preview**. This is an initial native implementation, not a declaration of full Moonfin parity. No physical Vita or personal Jellyfin/Emby server is attached to the development environment.
 
 ## Implemented paths
 
@@ -48,11 +48,19 @@ Features that cannot map to the Vita's display, codec hardware or OS will need e
 
 ## Verification
 
-Validation completed in the development environment: VitaSDK cross-build and VPK identity/assets checks passed; 56 protocol and local HTTP checks passed. The corrected VPK installs and launches on the user's Vita. Login and playback validation are pending.
+Validation completed in the development environment: VitaSDK cross-build and VPK identity/assets checks passed; 56 protocol and local HTTP checks passed. The user confirmed that the corrected VPK installs, launches and signs in to their server. Playback validation is pending.
 
-The first hardware installation attempt reported VitaShell error `0x8010113D`. The original package used truecolor LiveArea PNGs, including an RGBA icon. The corrected package uses opaque 8-bit indexed PNGs for the icon, background and startup image. Package validation now checks their encoding and dimensions, with regression tests rejecting truecolor, alpha and incorrect sizes. The user confirmed that the corrected package installs and launches. Startup then stopped at `ytdl: option not found`: the pinned Vita mpv build disables Lua and therefore omits that option. The unnecessary `ytdl=no` setting has been removed; startup beyond this point still needs device confirmation.
+The first hardware installation attempt reported VitaShell error `0x8010113D`. The original package used truecolor LiveArea PNGs, including an RGBA icon. The corrected package uses opaque 8-bit indexed PNGs for the icon, background and startup image. Package validation now checks their encoding and dimensions, with regression tests rejecting truecolor, alpha and incorrect sizes. The user confirmed that the corrected package installs and launches. Startup then stopped at `ytdl: option not found`: the pinned Vita mpv build disables Lua and therefore omits that option. The unnecessary `ytdl=no` setting has been removed; the user subsequently confirmed successful startup and sign-in.
 
 The portable tests exercise the code used by the native client: URL escaping/base paths, login, profile limits, direct/transcoded resolution, track indices, resume tick conversion, session cleanup, settings persistence, queue ordering, HTTP request transport, redirect refusal and response-size bounds. They use scripted responses and a local HTTP test server. They do **not** establish that a video has played on a real Vita.
+
+## 0.1.1 main-menu crash correction
+
+The uploaded core dump from build `6f1b79f` stops at `0x810b2320` in `brls::Application::handleAction`. Its current-focus pointer references freed login UI memory, already reused for JSON data. The pinned Borealis implementation ignored `giveFocus(nullptr)`; replacing the login screen left that dangling pointer active.
+
+The Vita build now compiles a generated Borealis override that releases null focus and clears focus before activity teardown. The submodule remains unchanged. Home/server screens explicitly focus their new buttons, and root-screen replacement is deferred until action dispatch has finished. Host regression checks execute the actual dependency methods against lightweight UI stubs: the original fails, and the patched methods pass. These checks do not emulate drawing or establish device stability.
+
+Build artifacts now include source-line information and the original ELF for future dump analysis. After installing 0.1.1, repeat sign-in, leave Home idle, navigate its buttons, refresh Home and switch servers. On-device confirmation of this correction is pending.
 
 ## First hardware pass
 

@@ -15,6 +15,8 @@ struct App;
 App *app = nullptr;
 void accounts(bool reset = false);
 void home();
+void showAccounts(bool reset);
+void showHome();
 void library(std::string title, Params query, int start = 0);
 void detail(Json);
 void settings();
@@ -400,6 +402,14 @@ void login(const std::string &url) {
       });
 }
 void accounts(bool reset) {
+  // A reset can originate in an action listener. Let input dispatch finish
+  // before freeing the activity and the listener it is currently iterating.
+  jobs->complete([reset] {
+    if (app)
+      showAccounts(reset);
+  });
+}
+void showAccounts(bool reset) {
   if (reset) {
     Application::giveFocus(nullptr);
     Application::clear();
@@ -439,6 +449,7 @@ void accounts(bool reset) {
       label("Moonfin Vita " + std::string(version) +
             " · Native preview\nUse your existing Jellyfin or Emby server. No "
             "additional streaming proxy is required."));
+  Application::giveFocus(p->body);
 }
 void libraries() {
   auto *p = new Page("Libraries");
@@ -456,6 +467,12 @@ void libraries() {
           });
 }
 void home() {
+  jobs->complete([] {
+    if (app)
+      showHome();
+  });
+}
+void showHome() {
   Application::giveFocus(nullptr);
   Application::clear();
   auto *p = new Page("Moonfin · " + app->client->account().userName, true);
@@ -474,6 +491,9 @@ void home() {
       170);
   button(nav, "Live TV", liveTv, 150);
   button(nav, "Settings", settings, 165);
+  // The page was pushed before its buttons existed. Establish live focus now,
+  // without waiting for the asynchronous home/artwork requests to finish.
+  Application::giveFocus(nav);
   auto c = app->client;
   p->load(
       [c] {

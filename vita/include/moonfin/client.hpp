@@ -12,7 +12,7 @@ namespace moonfin {
 using Json = nlohmann::json;
 using Params = std::map<std::string, std::string>;
 constexpr int64_t ticksPerSecond = 10000000;
-constexpr const char *version = "0.1.0";
+constexpr const char *version = "0.1.1";
 
 struct Response {
   long status = 0;

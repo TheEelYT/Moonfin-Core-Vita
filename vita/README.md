@@ -2,7 +2,7 @@
 
 A native PlayStation Vita client in the Moonfin Core fork. The Vita target is C++17, Borealis and Vita mpv/GXM; it does not run Flutter or require a second proxy application on your PC. Jellyfin or Emby provides any required transcoding.
 
-**Current version: 0.1.0 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
+**Current version: 0.1.1 native preview. This is not yet full Moonfin feature parity.** See [PORT_STATUS.md](PORT_STATUS.md) for the implementation and validation record.
 
 ## Install and connect
 
@@ -44,7 +44,7 @@ python3 vita/scripts/check-vpk.py build-vita/MoonfinVita.vpk
 
 The dependency installer checks SHA-256 hashes from `dependencies.lock.json` and installs packages in one transaction. Existing SDL2 headers from either `sdl2` or `sdl2_vitagl` are reused because the GXM target does not link SDL; a clean SDK receives the pinned SDL2 package. This avoids both the SDK image's conflicting SDL providers and the incomplete 2026.08 package snapshot encountered during development. It changes packages in the specified VitaSDK prefix; use a dedicated SDK prefix/container if that SDK serves other projects. The native workflow uses `vitasdk/vitasdk:2026.08`. No proprietary shader compiler package is required; this build uses GXM with precompiled shaders.
 
-The **Vita native client** GitHub Actions workflow builds both the VPK and the portable protocol tests. Its artifact includes the VPK and debug VELF.
+The **Vita native client** GitHub Actions workflow builds the VPK and runs the portable tests. Its artifact includes the installable VPK, VELF and original ELF with source-line information for crash analysis. The build generates a focused Borealis source override for null-focus cleanup without modifying the pinned submodule.
 
 Host verification:
 
@@ -53,6 +53,7 @@ cmake -S vita -B build-vita-tests -G Ninja -DMOONFIN_HOST_TESTS=ON
 cmake --build build-vita-tests
 ctest --test-dir build-vita-tests --output-on-failure
 python3 vita/tests/http_integration.py build-vita-tests/moonfin-tests
+python3 -m unittest discover -s vita/tests -p 'test_*.py'
 ```
 
 ## Source and licensing

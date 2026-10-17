@@ -46,4 +46,5 @@ jobs:
           path: |
             build-vita/MoonfinVita.vpk
             build-vita/MoonfinVita.velf
+            build-vita/MoonfinVita.elf
           if-no-files-found: error
