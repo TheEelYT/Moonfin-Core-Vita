@@ -15,8 +15,6 @@ struct App;
 App *app = nullptr;
 void accounts(bool reset = false);
 void home();
-void showAccounts(bool reset);
-void showHome();
 void library(std::string title, Params query, int start = 0);
 void detail(Json);
 void settings();
@@ -57,19 +55,38 @@ Label *label(const std::string &text, float size = 23) {
   l->setMarginBottom(12);
   return l;
 }
+class MenuButton : public Button {
+  std::shared_ptr<int> alive = std::make_shared<int>(0);
+
+public:
+  explicit MenuButton(std::function<void()> cb) {
+    auto weak = std::weak_ptr<int>(alive);
+    registerClickAction([cb = std::move(cb), weak](View *) {
+      // Input dispatch still accesses this button and its action after return.
+      // Run screen changes on the next drain, only if the button still exists.
+      jobs->complete([cb, weak] {
+        if (!weak.expired())
+          cb();
+      });
+      return true;
+    });
+  }
+  ~MenuButton() override { alive.reset(); }
+};
 Button *button(Box *parent, const std::string &text, std::function<void()> cb,
                float width = 0) {
-  auto *b = new Button();
+  auto *b = new MenuButton(std::move(cb));
   b->setText(text);
   b->setHeight(54);
   if (width)
     b->setWidth(width);
   b->setMargins(0, 10, 10, 0);
-  b->registerClickAction([cb](View *) {
-    cb();
-    return true;
-  });
   parent->addView(b);
+  if (!Application::getCurrentFocus()) {
+    const auto stack = Application::getActivitiesStack();
+    if (!stack.empty() && b->getParentActivity() == stack.back())
+      Application::giveFocus(b);
+  }
   return b;
 }
 std::string clockText(double seconds) {
@@ -402,14 +419,6 @@ void login(const std::string &url) {
       });
 }
 void accounts(bool reset) {
-  // A reset can originate in an action listener. Let input dispatch finish
-  // before freeing the activity and the listener it is currently iterating.
-  jobs->complete([reset] {
-    if (app)
-      showAccounts(reset);
-  });
-}
-void showAccounts(bool reset) {
   if (reset) {
     Application::giveFocus(nullptr);
     Application::clear();
@@ -467,12 +476,6 @@ void libraries() {
           });
 }
 void home() {
-  jobs->complete([] {
-    if (app)
-      showHome();
-  });
-}
-void showHome() {
   Application::giveFocus(nullptr);
   Application::clear();
   auto *p = new Page("Moonfin · " + app->client->account().userName, true);

@@ -98,9 +98,12 @@ class BorealisFocusTest(unittest.TestCase):
     def exercise(self, source):
         methods = "\n".join(method(source, s) for s in (
             "void Application::giveFocus(View* view)", "void Application::clear()"))
+        return self.run_cpp(HARNESS.replace("@METHODS@", methods))
+
+    def run_cpp(self, source):
         with tempfile.TemporaryDirectory() as folder:
             cpp, binary = Path(folder) / "focus.cpp", Path(folder) / "focus-test"
-            cpp.write_text(HARNESS.replace("@METHODS@", methods))
+            cpp.write_text(source)
             compiler = shutil.which("c++")
             self.assertIsNotNone(compiler, "A host C++ compiler is required")
             subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", str(cpp), "-o", str(binary)],
@@ -119,6 +122,49 @@ class BorealisFocusTest(unittest.TestCase):
     def test_changed_dependency_requires_review(self):
         with self.assertRaisesRegex(RuntimeError, "context changed"):
             patcher.fix_focus("unrecognized source")
+
+    def test_menu_callbacks_wait_for_dispatch_and_cancel_after_deletion(self):
+        source = method((VITA / "src/app.cpp").read_text(), "class MenuButton") + ";"
+        harness = r'''
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <stdexcept>
+struct View {};
+struct Button : View {
+    std::function<bool(View*)> listener;
+    virtual ~Button() = default;
+    void registerClickAction(std::function<bool(View*)> cb) { listener = std::move(cb); }
+};
+struct Queue {
+    std::vector<std::function<void()>> tasks;
+    void complete(std::function<void()> cb) { tasks.push_back(std::move(cb)); }
+    void drain() { auto batch = std::move(tasks); tasks.clear(); for (auto& cb : batch) cb(); }
+} queue;
+auto* jobs = &queue;
+@BUTTON@
+int main() {
+    int calls = 0;
+    auto* button = new MenuButton([&] { ++calls; });
+    button->listener(button);
+    if (calls != 0) return 1; // Dispatch must finish before running callbacks.
+    queue.drain();
+    if (calls != 1) return 2;
+    button->listener(button);
+    delete button;
+    queue.drain();
+    if (calls != 1) return 3; // A deleted screen must not run its queued action.
+    auto* selfDeleting = static_cast<MenuButton*>(nullptr);
+    selfDeleting = new MenuButton([&] { ++calls; delete selfDeleting; });
+    selfDeleting->listener(selfDeleting);
+    if (calls != 1) return 4;
+    queue.drain();
+    return calls == 2 ? 0 : 5;
+}
+'''
+        result = self.run_cpp(harness.replace("@BUTTON@", source))
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
