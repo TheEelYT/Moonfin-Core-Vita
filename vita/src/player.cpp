@@ -35,7 +35,8 @@ Player::Player() {
     option("video-latency-hacks", "yes");
     option("demuxer-max-bytes", "16MiB");
     option("demuxer-max-back-bytes", "4MiB");
-    option("ytdl", "no");
+    // The pinned Vita mpv is built with Lua disabled, so its ytdl option
+    // does not exist. Server-provided media URLs do not use that hook.
     option("osd-level", "0");
     option("input-default-bindings", "no");
     option("tls-verify", "yes");
